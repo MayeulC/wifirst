@@ -66,93 +66,99 @@ cookies = http.cookiejar.CookieJar()
 crawler = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookies))
 crawler.addheaders = [('User-Agent', USER_AGENT)]
 
+
 def main(login, password, delay):
-  logger.info("Press Ctrl+C to stop")
-  logger.info("")
+    logger.info("Press Ctrl+C to stop")
+    logger.info("")
 
-  while 1:
-    if test():
-      logger.info("Wifirst is not blocking the connection.")
-    else:
-      logger.info("Wifirst is blocking the connection! (for now)")
+    while 1:
+        if test():
+            logger.info("Wifirst is not blocking the connection.")
+        else:
+            logger.info("Wifirst is blocking the connection! (for now)")
 
-      if reconnect(login, password):
-        logger.info("Connection successful! :)")
-        logger.info("I will keep checking every %ss, though", delay)
-      else:
-        logger.info("Connection failed... :(")
+            if reconnect(login, password):
+                logger.info("Connection successful! :)")
+                logger.info("I will keep checking every %ss, though", delay)
+            else:
+                logger.info("Connection failed... :(")
 
-    logger.debug("Trying again in %ss.", delay)
-    time.sleep(delay)
+        logger.debug("Trying again in %ss.", delay)
+        time.sleep(delay)
+
 
 def test():
-  logger.debug("Testing connection...")
+    logger.debug("Testing connection...")
 
-  response = crawler.open(TEST_URL)
+    response = crawler.open(TEST_URL)
 
-  return response.geturl() == TEST_URL
+    return response.geturl() == TEST_URL
+
 
 def reconnect(login, password):
-  token = fetch_token()
+    token = fetch_token()
 
-  return authenticate(login, password, token)
+    return authenticate(login, password, token)
+
 
 def fetch_token():
-  logger.info("Authenticating (1/4)...")
-  logger.debug("Fetching a token...")
+    logger.info("Authenticating (1/4)...")
+    logger.debug("Fetching a token...")
 
-  response = crawler.open(TOKEN_URL)
-  tree     = lxml.html.parse(response)
-  token    = tree.xpath(TOKEN_XPATH)[0]
+    response = crawler.open(TOKEN_URL)
+    tree     = lxml.html.parse(response)
+    token    = tree.xpath(TOKEN_XPATH)[0]
 
-  logger.debug("Token: %s", token)
+    logger.debug("Token: %s", token)
 
-  return token
+    return token
+
 
 def authenticate(login, password, token):
-  logger.info("Authenticating (2/4)...")
-  logger.debug("Creating a session...")
+    logger.info("Authenticating (2/4)...")
+    logger.debug("Creating a session...")
 
-  crawler.open(SESSION_URL, urllib.parse.urlencode({
-    'login': login,
-    'password': password,
-    'authenticity_token': token
-  }))
+    crawler.open(SESSION_URL, urllib.parse.urlencode({
+        'login': login,
+        'password': password,
+        'authenticity_token': token
+        }))
 
-  logger.info("Authenticating (3/4)...")
-  logger.debug("Fetching temporary ids...")
+    logger.info("Authenticating (3/4)...")
+    logger.debug("Fetching temporary ids...")
 
-  response = crawler.open(LOGIN_URL)
-  tree     = lxml.html.parse(response)
-  username = tree.xpath(USERNAME_XPATH)[0]
-  tmp_pass = tree.xpath(PASSWORD_XPATH)[0]
+    response = crawler.open(LOGIN_URL)
+    tree     = lxml.html.parse(response)
+    username = tree.xpath(USERNAME_XPATH)[0]
+    tmp_pass = tree.xpath(PASSWORD_XPATH)[0]
 
-  logger.debug("Username: %s", username)
-  logger.debug("Password: %s", tmp_pass)
+    logger.debug("Username: %s", username)
+    logger.debug("Password: %s", tmp_pass)
 
-  logger.info("Authenticating (4/4)...")
-  logger.debug("Signing in...")
+    logger.info("Authenticating (4/4)...")
+    logger.debug("Signing in...")
 
-  response = crawler.open(REQUEST_URL, urllib.parse.urlencode({
-    'username': username,
-    'password': tmp_pass,
-    'qos_class': 0,
-    'success_url': SUCCESS_URL,
-    'error_url': ERROR_URL
-  }))
+    response = crawler.open(REQUEST_URL, urllib.parse.urlencode({
+        'username': username,
+        'password': tmp_pass,
+        'qos_class': 0,
+        'success_url': SUCCESS_URL,
+        'error_url': ERROR_URL
+        }))
 
-  return response.geturl() == SUCCESS_URL
+    return response.geturl() == SUCCESS_URL
+
 
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser(description="A simple script to reconnect to Wifirst.")
-  parser.add_argument('login', help='your Wifirst login (e-mail address)')
-  parser.add_argument('password', help='your Wifirst password')
-  parser.add_argument('-v', '--verbose', action='store_true', help='make me say stuff')
-  parser.add_argument('-d', '--delay', type=int, default=10, help='delay between attempts, in seconds (default: 10)')
+    parser = argparse.ArgumentParser(description="A simple script to reconnect to Wifirst.")
+    parser.add_argument('login', help='your Wifirst login (e-mail address)')
+    parser.add_argument('password', help='your Wifirst password')
+    parser.add_argument('-v', '--verbose', action='store_true', help='make me say stuff')
+    parser.add_argument('-d', '--delay', type=int, default=10, help='delay between attempts, in seconds (default: 10)')
 
-  args = parser.parse_args()
+    args = parser.parse_args()
 
-  if args.verbose:
-    logger.setLevel(logging.DEBUG)
+    if args.verbose:
+        logger.setLevel(logging.DEBUG)
 
-  main(args.login, args.password, args.delay)
+    main(args.login, args.password, args.delay)
