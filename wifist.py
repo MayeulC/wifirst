@@ -29,42 +29,29 @@ A simple script to reconnect to Wifirst.
 Copyright (c) 2014 Jean Dupouy. All Rights Reserved.
 """
 
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
 import argparse
-import http.cookiejar
 import logging
-import lxml.html
 import signal
 import sys
 import time
-import urllib.request, urllib.parse, urllib.error
-import urllib.request, urllib.error, urllib.parse
 
-__author__     = "Jean Dupouy"
-__version__    = "0.1.0"
+__author__ = "Jean Dupouy"
+__version__ = "0.2.0"
 
-USER_AGENT     = 'Mozilla/5.0 (compatible, MSIE 11, Windows NT 6.3; Trident/7.0; rv:11.0) like Gecko'
-TEST_URL       = 'http://example.com/'
-TOKEN_URL      = 'https://selfcare.wifirst.net/sessions/new'
-SESSION_URL    = 'https://selfcare.wifirst.net/sessions'
-LOGIN_URL      = 'https://connect.wifirst.net/?perform=true'
-REQUEST_URL    = 'https://wireless.wifirst.net:8090/goform/HtmlLoginRequest'
-SUCCESS_URL    = 'https://apps.wifirst.net/?redirected=true'
-ERROR_URL      = 'https://connect.wifirst.net/login_error'
+url_test = "http://example.com/"
 
-TOKEN_XPATH    = '//input[@name=\'authenticity_token\']/@value'
-USERNAME_XPATH = '//input[@name=\'username\']/@value'
-PASSWORD_XPATH = '//input[@name=\'password\']/@value'
 
 signal.signal(signal.SIGINT, lambda s, f: sys.exit())
 
-logger  = logging.getLogger()
+logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-logger.addHandler(logging.StreamHandler())
+if not logger.hasHandlers():
+    logger.addHandler(logging.StreamHandler())
 
-cookies = http.cookiejar.CookieJar()
-
-crawler = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookies))
-crawler.addheaders = [('User-Agent', USER_AGENT)]
+session = requests.Session()
 
 
 def main(login, password, delay):
@@ -72,81 +59,56 @@ def main(login, password, delay):
     logger.info("")
 
     while 1:
-        if test():
+        test_request = session.get(url_test)
+        if test_request.url == url_test:
             logger.info("Wifirst is not blocking the connection.")
         else:
-            logger.info("Wifirst is blocking the connection! (for now)")
-
-            if reconnect(login, password):
-                logger.info("Connection successful! :)")
-                logger.info("I will keep checking every %ss, though", delay)
-            else:
-                logger.info("Connection failed... :(")
+            logger.info(("Wifirst is blocking the connection! ",
+                         "Trying to reconnect..."))
+            reconnect(test_request, login, password)
 
         logger.debug("Trying again in %ss.", delay)
         time.sleep(delay)
 
 
-def test():
-    logger.debug("Testing connection...")
+def reconnect(test_request, login, password):
+    # First, get the URL of the redirection. After querying our test page, we
+    # get a 302, then a page with a meta-tag redirection
+    soup = BeautifulSoup(test_request.text, "lxml")
+    meta = soup.find("meta", attrs={'http-equiv': 'refresh'})['content']
+    url_perform = meta[meta.find("URL=")+4:]
 
-    response = crawler.open(TEST_URL)
+    # Once we get the URL, we load it, and store the cookies. The cookie
+    # storage is handled by the session. We then need a CSRF (or whatever it is
+    # used for) token from a pre-filled, invisible field in the login form.
+    # We also extract the submit URL from the form
+    perform_request = session.get(url_perform)
+    soup = BeautifulSoup(perform_request.text, "lxml")
+    token = soup.find(attrs={"name": "authenticity_token"})['value']
 
-    return response.geturl() == TEST_URL
+    data = {'utf8': '✓',
+            'authenticity_token': token,
+            'login': login,
+            'password': password
+            }
+    urlpart = soup.find("form", attrs={"id": "signin-form"})['action']
+    url_session = urljoin(perform_request.url, urlpart)
+    session_request = session.post(url_session, data=data)
 
-
-def reconnect(login, password):
-    token = fetch_token()
-
-    return authenticate(login, password, token)
-
-
-def fetch_token():
-    logger.info("Authenticating (1/4)...")
-    logger.debug("Fetching a token...")
-
-    response = crawler.open(TOKEN_URL)
-    tree     = lxml.html.parse(response)
-    token    = tree.xpath(TOKEN_XPATH)[0]
-
-    logger.debug("Token: %s", token)
-
-    return token
-
-
-def authenticate(login, password, token):
-    logger.info("Authenticating (2/4)...")
-    logger.debug("Creating a session...")
-
-    crawler.open(SESSION_URL, urllib.parse.urlencode({
-        'login': login,
-        'password': password,
-        'authenticity_token': token
-        }))
-
-    logger.info("Authenticating (3/4)...")
-    logger.debug("Fetching temporary ids...")
-
-    response = crawler.open(LOGIN_URL)
-    tree     = lxml.html.parse(response)
-    username = tree.xpath(USERNAME_XPATH)[0]
-    tmp_pass = tree.xpath(PASSWORD_XPATH)[0]
-
-    logger.debug("Username: %s", username)
-    logger.debug("Password: %s", tmp_pass)
-
-    logger.info("Authenticating (4/4)...")
-    logger.debug("Signing in...")
-
-    response = crawler.open(REQUEST_URL, urllib.parse.urlencode({
-        'username': username,
-        'password': tmp_pass,
-        'qos_class': 0,
-        'success_url': SUCCESS_URL,
-        'error_url': ERROR_URL
-        }))
-
-    return response.geturl() == SUCCESS_URL
+    # After "logging in", we are given a new username/password combo with which
+    # to authenticate on the local gateway, prefilled in a form which is
+    # normally automatically submitted. We just need to find the submission URL
+    # and post the input fields there (except for the input button)
+    soup = BeautifulSoup(session_request.text, "lxml")
+    url_login = soup.find("form")['action']
+    data = dict()  # will contain the form data/name combos
+    for input_field in soup.find("form").find_all("input"):
+        if (input_field["type"] == "hidden" and
+                input_field.get('id') is not None):  # Filter the button
+            data[input_field['id']] = input_field['value']
+    # We should be logged in after the next step. If not, this function will be
+    # called again next time the connection status is checked.
+    session.post(url_login, data=data)
 
 
 if __name__ == '__main__':
@@ -160,5 +122,7 @@ if __name__ == '__main__':
 
     if args.verbose:
         logger.setLevel(logging.DEBUG)
+    else:
+        logging.getLogger("requests").setLevel(logging.WARNING)
 
     main(args.login, args.password, args.delay)
