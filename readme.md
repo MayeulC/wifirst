@@ -1,10 +1,13 @@
 # wifist
 
-A simple Python script to reconnect to Wifirst, based on [Wifirst_keepalive](https://github.com/Tulux/Wifirst_keepalive) by [Tulux](https://github.com/Tulux).
+A simple Python script to reconnect to Wifirst, based on
+[Wifirst_keepalive](https://github.com/Tulux/Wifirst_keepalive) by
+[Tulux](https://github.com/Tulux).
 
 ## usage
 
-You may need to install `lxml` first, simply run `pip install lxml`.
+You may need to install `lxml`, `requests` and `BeautifulSoup` first.
+Simply run `pip install lxml requests bs4`.
 
 ```
 usage: wifist.py [-h] [-v] [-d DELAY] login password
