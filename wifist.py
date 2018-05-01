@@ -4,6 +4,7 @@
 # The MIT License (MIT)
 #
 # Copyright (c) 2014 Jean Dupouy
+# Copyright (c) 2018 Mayeul Cantan
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -26,7 +27,8 @@
 """
 A simple script to reconnect to Wifirst.
 
-Copyright (c) 2014 Jean Dupouy. All Rights Reserved.
+Copyright (c) 2014 Jean Dupouy
+Copyright (c) 2018 Mayeul Cantan
 """
 
 import requests
