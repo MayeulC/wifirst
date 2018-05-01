@@ -27,14 +27,14 @@ Copyright (c) 2014 Jean Dupouy. All Rights Reserved.
 """
 
 import argparse
-import cookielib
+import http.cookiejar
 import logging
 import lxml.html
 import signal
 import sys
 import time
-import urllib
-import urllib2
+import urllib.request, urllib.parse, urllib.error
+import urllib.request, urllib.error, urllib.parse
 
 __author__     = "Jean Dupouy"
 __version__    = "0.1.0"
@@ -58,9 +58,9 @@ logger  = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
 
-cookies = cookielib.CookieJar()
+cookies = http.cookiejar.CookieJar()
 
-crawler = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookies))
+crawler = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookies))
 crawler.addheaders = [('User-Agent', USER_AGENT)]
 
 def main(login, password, delay):
@@ -110,7 +110,7 @@ def authenticate(login, password, token):
   logger.info("Authenticating (2/4)...")
   logger.debug("Creating a session...")
 
-  crawler.open(SESSION_URL, urllib.urlencode({
+  crawler.open(SESSION_URL, urllib.parse.urlencode({
     'login': login,
     'password': password,
     'authenticity_token': token
@@ -130,7 +130,7 @@ def authenticate(login, password, token):
   logger.info("Authenticating (4/4)...")
   logger.debug("Signing in...")
 
-  response = crawler.open(REQUEST_URL, urllib.urlencode({
+  response = crawler.open(REQUEST_URL, urllib.parse.urlencode({
     'username': username,
     'password': tmp_pass,
     'qos_class': 0,
