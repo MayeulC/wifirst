@@ -37,6 +37,7 @@ import logging
 import signal
 import sys
 import time
+import http.client
 
 __author__ = "Jean Dupouy"
 __version__ = "0.2.0"
@@ -112,17 +113,23 @@ def reconnect(test_request, login, password):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="A simple script to reconnect to Wifirst.")
+    parser = argparse.ArgumentParser(
+            description="A simple script to reconnect to Wifirst.")
     parser.add_argument('login', help='your Wifirst login (e-mail address)')
     parser.add_argument('password', help='your Wifirst password')
-    parser.add_argument('-v', '--verbose', action='store_true', help='make me say stuff')
-    parser.add_argument('-d', '--delay', type=int, default=10, help='delay between attempts, in seconds (default: 10)')
+    parser.add_argument(
+            '-v', '--verbose', action='count', help='make me say stuff')
+    parser.add_argument(
+            '-d', '--delay', type=int, default=10,
+            help='delay between attempts, in seconds (default: 10)')
 
     args = parser.parse_args()
 
-    if args.verbose:
-        logger.setLevel(logging.DEBUG)
-    else:
+    if args.verbose is None:
         logging.getLogger("requests").setLevel(logging.WARNING)
+    else:
+        logger.setLevel(logging.DEBUG)
+        if args.verbose > 1:
+            http.client.HTTPConnection.debuglevel = 1
 
     main(args.login, args.password, args.delay)
